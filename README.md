@@ -35,7 +35,7 @@ A single-file Windows tool that turns a video into a clean image sequence for ph
 2. Double-click it.
 3. **Page 1**: choose the interface language (top line) and a video. Enter opens the video, Esc exits.
 4. **Page 2**: change settings with ←/→, then press Enter on any item to start. The first item, `<<< BACK`, returns to the video list.
-5. Wait for processing. Frames are saved to `<video name>\<video name>_00001.jpg`, …
+5. Wait for processing. Frames are saved to `<video name>\<video name>_00001.jpg`, … (see *Number in file name*).
 
 ![Settings](docs/settings_en.png)
 
@@ -49,6 +49,7 @@ A single-file Windows tool that turns a video into a clean image sequence for ph
 | Remove duplicates | yes / no | Drop frames almost identical to the previous kept one. |
 | Keep rejected frames | yes / no | Save dropped frames to `_rejected\` with the reason in the file name, so you can check what was removed. |
 | Format | JPG / PNG | JPG quality 95 (~1–3 MB for 4K), PNG lossless (~25–30 MB for 4K). |
+| Number in file name | 1, 2, 3… / 0, 1, 2… / video frame number (from 0) | How frames are numbered: consecutively from 1, consecutively from 0, or by the frame's index in the original video (e.g. `_00000`, `_00010`, `_00020`… at every 10th frame). The settings page shows example names. |
 | Write EXIF | yes / no | Turn focal-length EXIF on or off. |
 | EXIF focal length | 13–85 mm | 35 mm equivalent focal length of the camera that shot the video. |
 
@@ -65,7 +66,7 @@ A single-file Windows tool that turns a video into a clean image sequence for ph
    - sharpness = variance of the Laplacian, plus mean brightness;
    - in each window of N frames the sharpest well-exposed frame becomes a *candidate*;
    - candidates are judged in clusters of 30, each compared with ±7 neighbours. A candidate is rejected as **blur** if it is clearly less sharp than the local median or the median of the whole video, as **exposure** if its mean brightness is outside 15–240, or as **duplicate** if its 64×36 thumbnail barely differs from the last kept frame;
-   - accepted frames are encoded in background threads and written to disk immediately, numbered consecutively.
+   - accepted frames are encoded in background threads and written to disk immediately.
 4. Settings are saved to `make_sequence.json` next to the `.bat`.
 
 ## Limitations
@@ -76,7 +77,7 @@ A single-file Windows tool that turns a video into a clean image sequence for ph
 - **8-bit output**: with cleaning ON frames go through 8-bit YUV 4:2:0, so HDR / 10-bit video is converted without tone mapping and may look flat.
 - **Only the first video stream** is used. Audio and other streams are ignored.
 - **Heuristic cleaning**: the sharpness measure can't tell motion blur from out-of-focus blur or from a plain, low-texture surface. On scenes with large textureless areas use the *soft* strictness, or keep rejected frames and check them.
-- **Frames are renumbered** after cleaning. The original frame index is kept only in `_rejected` file names.
+- **Numbers have gaps** in the *video frame number* mode, since dropped frames leave holes. Some tools expect a continuous sequence; use 0, 1, 2… or 1, 2, 3… for them.
 - **Disk space**: 4K PNG takes ~28 MB per frame, so a 5-minute video at "all" frames needs ~270 GB. Check the size estimate in the settings before you start.
 - Performance depends on the CPU. Decoding uses hardware acceleration when ffmpeg supports it (`-hwaccel auto`).
 
@@ -123,7 +124,7 @@ A single-file Windows tool that turns a video into a clean image sequence for ph
 2. Запустите двойным кликом.
 3. **Страница 1**: выберите язык интерфейса (верхняя строка) и видео. Enter открывает видео, Esc закрывает программу.
 4. **Страница 2**: меняйте настройки стрелками ←/→ и нажмите Enter на любом пункте, чтобы начать. Первый пункт, `<<< НАЗАД`, возвращает к списку видео.
-5. Дождитесь окончания. Кадры сохраняются в `<имя видео>\<имя видео>_00001.jpg`, …
+5. Дождитесь окончания. Кадры сохраняются в `<имя видео>\<имя видео>_00001.jpg`, … (см. *Номер в имени файла*).
 
 ![Настройки](docs/settings_ru.png)
 
@@ -137,6 +138,7 @@ A single-file Windows tool that turns a video into a clean image sequence for ph
 | Убирать дубликаты | да / нет | Выбрасывать кадры, почти не отличающиеся от предыдущего сохранённого. |
 | Сохранить отбракованные | да / нет | Сохранять выброшенные кадры в `_rejected\` с причиной в имени файла, чтобы можно было проверить, что удалено. |
 | Формат | JPG / PNG | JPG качество 95 (~1–3 МБ на 4K-кадр), PNG без потерь (~25–30 МБ на 4K-кадр). |
+| Номер в имени файла | 1, 2, 3… / 0, 1, 2… / номер кадра в видео (с 0) | Как нумеруются кадры: подряд с 1, подряд с 0 или по номеру кадра в исходном видео (например `_00000`, `_00010`, `_00020`… при каждом 10-м кадре). На странице настроек показан пример имён. |
 | Записывать EXIF | да / нет | Включает или выключает запись фокусного в EXIF. |
 | Фокусное для EXIF | 13–85 мм | Эквивалентное фокусное (35 мм) камеры, которой снято видео. |
 
@@ -153,7 +155,7 @@ A single-file Windows tool that turns a video into a clean image sequence for ph
    - резкость считается как дисперсия лапласиана, плюс средняя яркость;
    - в каждом окне из N кадров самый резкий кадр с нормальной экспозицией становится *кандидатом*;
    - кандидаты оцениваются кластерами по 30, каждый сравнивается с ±7 соседями. Кандидат отбраковывается как **размытие**, если он заметно мягче локальной медианы или медианы всего видео; как **экспозиция**, если средняя яркость вне 15–240; как **дубликат**, если его миниатюра 64×36 почти не отличается от последнего сохранённого кадра;
-   - принятые кадры кодируются в фоновых потоках, сразу пишутся на диск и нумеруются подряд.
+   - принятые кадры кодируются в фоновых потоках и сразу пишутся на диск.
 4. Настройки сохраняются в `make_sequence.json` рядом с `.bat`.
 
 ## Ограничения
@@ -164,7 +166,7 @@ A single-file Windows tool that turns a video into a clean image sequence for ph
 - **8 бит**: с очисткой кадры проходят через 8-битный YUV 4:2:0, поэтому HDR и 10-битное видео конвертируется без тонмаппинга и может выглядеть блёклым.
 - **Берётся только первый видеопоток**, звук и другие потоки игнорируются.
 - **Очистка эвристическая**: резкость не отличает смаз от расфокуса и от просто однотонной поверхности. Для сцен с большими участками без текстуры выбирайте *мягкую* строгость или сохраняйте отбракованные кадры и проверяйте их.
-- **После очистки кадры перенумеровываются**. Исходный номер кадра остаётся только в именах файлов в `_rejected`.
+- **В режиме «номер кадра в видео» нумерация с пропусками**, ведь отброшенные кадры оставляют дыры. Некоторые программы ждут непрерывную секвенцию, для них выбирайте 0, 1, 2… или 1, 2, 3….
 - **Место на диске**: 4K PNG занимает ~28 МБ на кадр, 5 минут видео со всеми кадрами — ~270 ГБ. Проверьте оценку размера в настройках перед стартом.
 - Скорость зависит от процессора. Декодирование использует аппаратное ускорение, если ffmpeg его поддерживает (`-hwaccel auto`).
 

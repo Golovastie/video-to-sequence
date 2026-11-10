@@ -18,6 +18,11 @@ STRICT = [  # (рус, англ), доля от локальной медиан�
     (('средняя', 'medium'), 0.50, 0.25),
     (('строгая', 'strict'), 0.65, 0.35),
 ]
+NUMBERING = [  # нумерация файлов секвенции
+    ('1, 2, 3...', '1, 2, 3...'),
+    ('0, 1, 2...', '0, 1, 2...'),
+    ('номер кадра в видео (с 0)', 'video frame number (from 0)'),
+]
 FOCAL_CHOICES = [13, 14, 16, 18, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 32, 35, 40, 50, 70, 85]
 DEFAULT_F35 = 26          # мм экв. 35 мм; типично для основной камеры телефона
 EXIF_MAKE = 'VideoToSeq'   # Make в EXIF (камера из видео неизвестна)
@@ -303,11 +308,12 @@ def menu_settings(video, info, s):
             (T('Убирать дубликаты (камера стоит)', 'Remove duplicates (camera still)'), yes if s['dup'] else no),
             (T('Сохранить отбракованные в _rejected', 'Keep rejected frames in _rejected'), yes if s['keep_rej'] else no),
             (T('Формат', 'Format'), s['fmt'].upper()),
+            (T('Номер в имени файла', 'Number in file name'), T(*NUMBERING[s['num']])),
             (T('Записывать EXIF (фокусное)', 'Write EXIF (focal length)'), yes if s['exif'] else no),
             (T('Фокусное для EXIF (экв. 35 мм)', 'EXIF focal length (35 mm equiv.)'), f"{s['f35']} {T('мм', 'mm')}"),
             (T('>>> НАЧАТЬ', '>>> START'), ''),
         ]
-        disabled = (set() if s['clean'] else {3, 4, 5}) | (set() if s['exif'] else {8})
+        disabled = (set() if s['clean'] else {3, 4, 5}) | (set() if s['exif'] else {9})
         out = [CLS, CYN + T('  НАСТРОЙКИ', '  SETTINGS') + RST, '',
                T('  Видео:  ', '  Video:  ') + video,
                f'  {info["w"]}x{info["h"]}, {info["fps"]:.2f} fps, {fmt_time(info["dur"])}, '
@@ -337,6 +343,11 @@ def menu_settings(video, info, s):
         else:
             out.append(DIM + T(f'  Будет сохранено ~{expected} кадров без анализа.',
                                f'  ~{expected} frames will be saved without analysis.') + RST)
+        stem = os.path.splitext(video)[0]
+        first, second = [(1, 2), (0, 1), (0, step)][s['num']]
+        out.append(DIM + T('  Имена: ', '  Names: ') + f"{stem}_{first:05d}.{s['fmt']}, {stem}_{second:05d}.{s['fmt']}..." +
+                   (T('  (номера исходных кадров видео)', '  (original video frame numbers)') if s['num'] == 2 else '') +
+                   RST)
         if s['exif']:
             out.append(DIM + T('  Эквивалент 35 мм пишется в EXIF (Meshroom и др. считают по нему фокусное).',
                            '  The 35 mm equivalent goes into EXIF (Meshroom etc. derive the focal length from it).') + RST)
@@ -378,8 +389,10 @@ def menu_settings(video, info, s):
             elif idx == 6:
                 s['fmt'] = 'png' if s['fmt'] == 'jpg' else 'jpg'
             elif idx == 7:
+                s['num'] = (s['num'] + d) % len(NUMBERING)
+            elif idx == 8:
                 s['exif'] = not s['exif']
-            elif idx == 8 and s['exif']:
+            elif idx == 9 and s['exif']:
                 i = min(range(len(FOCAL_CHOICES)), key=lambda j: abs(FOCAL_CHOICES[j] - s['f35']))
                 s['f35'] = FOCAL_CHOICES[(i + d) % len(FOCAL_CHOICES)]
 
@@ -524,9 +537,10 @@ def stream_clean(ffmpeg, path, info, out_dir, stem, s, step):
         elif s['dup'] and st['last_thumb'] is not None and                 float(np.abs(c['thumb'] - st['last_thumb']).mean()) < DUP_THRESHOLD:
             reason = 'dup'
         if reason is None:
+            num = [st['kept'] + 1, st['kept'], c['idx']][s['num']]
             st['kept'] += 1
             st['last_thumb'] = c['thumb']
-            write(c, os.path.join(out_dir, f'{stem}_{st["kept"]:05d}.{ext}'))
+            write(c, os.path.join(out_dir, f'{stem}_{num:05d}.{ext}'))
         else:
             st['cnt'][reason] = st['cnt'].get(reason, 0) + 1
             if s['keep_rej']:
@@ -610,8 +624,16 @@ def extract_all(ffmpeg, path, info, out_dir, stem, s, step):
     q = ['-q:v', '2'] if ext == 'jpg' else ['-compression_level', '3']
     vf = 'null' if step == 1 else f"select='not(mod(n\\,{step}))'"
     cmd = [ffmpeg, '-v', 'error', '-y', '-hwaccel', 'auto', '-i', path, '-map', '0:v:0',
-           '-vf', vf, '-fps_mode', 'passthrough'] + q + [os.path.join(out_dir, f'{stem}_%05d.{ext}')]
+           '-vf', vf, '-fps_mode', 'passthrough'] + q + \
+          ['-start_number', '1' if s['num'] == 0 else '0', os.path.join(out_dir, f'{stem}_%05d.{ext}')]
     run_ffmpeg_progress(cmd, info['frames'], info['fps'], T('Экспорт', 'Export '))
+    if s['num'] == 2 and step > 1:
+        # файл i - это кадр видео i*step; переименование с конца, чтобы имена не пересекались
+        nums = sorted((int(f[len(stem) + 1:-len(ext) - 1]) for f in os.listdir(out_dir)
+                       if f.startswith(stem + '_') and f.endswith('.' + ext)), reverse=True)
+        for i in nums:
+            os.rename(os.path.join(out_dir, f'{stem}_{i:05d}.{ext}'),
+                      os.path.join(out_dir, f'{stem}_{i * step:05d}.{ext}'))
     # ffmpeg не пишет EXIF - дописываем в готовые файлы
     tiff = exif_for(s, stem, info['w'], info['h'])
     if tiff is None:
@@ -658,13 +680,14 @@ def process(ffmpeg, ffprobe, video, info, s):
 # -------------------------------------------------------------------- main
 def main():
     settings = load_settings({'lang': 'en', 'clean': True, 'fps': FPS_CHOICES.index('3'), 'strict': 1, 'dup': True,
-                              'keep_rej': False, 'fmt': 'jpg',
+                              'keep_rej': False, 'fmt': 'jpg', 'num': 0,
                               'fps_raw': FPS_CHOICES.index('all'), 'exif': True, 'f35': DEFAULT_F35})
     if settings['f35'] not in FOCAL_CHOICES:
         settings['f35'] = DEFAULT_F35
     settings['fps'] %= len(FPS_CHOICES)
     settings['fps_raw'] %= len(FPS_CHOICES)
     settings['strict'] %= len(STRICT)
+    settings['num'] %= len(NUMBERING)
     if settings['lang'] not in ('ru', 'en'):
         settings['lang'] = 'en'
     LANG[0] = settings['lang']
