@@ -1,0 +1,4 @@
+* text=auto
+# keep CRLF in the repository too, so raw/zip downloads work in cmd
+*.bat -text
+*.png binary

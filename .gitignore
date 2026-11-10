@@ -1,0 +1,22 @@
+# videos
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.m4v
+*.webm
+*.mts
+*.m2ts
+*.wmv
+*.mpg
+*.mpeg
+*.3gp
+# output and local settings
+*/_rejected/
+*.jpg
+*.png
+!docs/*.png
+make_sequence.json
+ffmpeg.exe
+ffprobe.exe
+__pycache__/
